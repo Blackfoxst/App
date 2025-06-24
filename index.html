@@ -118,6 +118,10 @@
     const sourceLinkEl = document.getElementById('sourceLink');
     const manualToggle = document.getElementById('manualToggle');
     const manualFields = document.getElementById('manualFields');
+    const mkEl = document.getElementById('manualKcal');
+    const mcEl = document.getElementById('manualCarbs');
+    const mpEl = document.getElementById('manualProtein');
+    const msEl = document.getElementById('manualSugars');
     const qtyEl = document.getElementById('quantityInput');
     const unitEl = document.getElementById('unitSelect');
     const addBtn = document.getElementById('addBtn');
@@ -141,10 +145,13 @@
     const STORAGE_KEY = 'calorie_entries';
     const LIQUIDS_KEY = 'liquid_intake';
     const FAV_KEY = 'fav_products';
+    const CUSTOM_KEY = 'custom_products';
 
     // State
     let lastNutri = null;
     let lastName = '';
+    let customDB = JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]');
+    const saveCustomDB = () => localStorage.setItem(CUSTOM_KEY, JSON.stringify(customDB));
 
     // Storage helpers
     const loadEntries = () => JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -159,21 +166,18 @@
       favListEl.innerHTML = '';
       loadFavs().forEach(name => {
         const btn = document.createElement('div');
-        btn.className = 'fav-item';
-        btn.textContent = name;
+        btn.className = 'fav-item'; btn.textContent = name;
         btn.addEventListener('click', () => { foodEl.value = name; });
         favListEl.appendChild(btn);
       });
     }
-
     // Favorite toggle
     favBtn.addEventListener('click', () => {
       if (!lastName) return;
       let favs = loadFavs();
       if (favs.includes(lastName)) favs = favs.filter(n => n !== lastName);
       else favs.push(lastName);
-      saveFavs(favs);
-      renderFavs();
+      saveFavs(favs); renderFavs();
       favBtn.textContent = favs.includes(lastName) ? '❤️' : '♡';
     });
 
@@ -204,6 +208,16 @@
       if (!name) return alert('Ingresa un nombre');
       searchStatusEl.textContent = 'Buscando...';
       try {
+        // first custom
+        const custom = customDB.find(p => p.name.toLowerCase() === name.toLowerCase());
+        if (custom) {
+          return fillProduct({ product_name: custom.name, brands: 'Manual', nutriments: {
+            'energy-kcal_100g': custom.kcal100,
+            'carbohydrates_100g': custom.carbs100,
+            'proteins_100g': custom.protein100,
+            'sugars_100g': custom.sugars100
+          }, url: '#' });
+        }
         const res = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(name)}&search_simple=1&action=process&json=1`);
         const data = await res.json();
         if (data.products && data.products.length) fillProduct(data.products[0]);
@@ -233,16 +247,36 @@
     // Add entry
     addBtn.addEventListener('click', () => {
       const meal = mealEl.value;
-      const name = foodEl.value.trim();
+      let name = foodEl.value.trim();
       const qty = parseFloat(qtyEl.value);
       const unit = unitEl.value;
-      if (!meal || !name || isNaN(qty) || !lastNutri) return alert('Completa todos los campos');
+      let nutr100;
+      if (manualToggle.checked) {
+        const mK = parseFloat(mkEl.value);
+        const mC = parseFloat(mcEl.value);
+        const mP = parseFloat(mpEl.value);
+        const mS = parseFloat(msEl.value);
+        if (!name || isNaN(mK) || isNaN(mC) || isNaN(mP) || isNaN(mS)) {
+          return alert('Completa los datos manuales antes de añadir');
+        }
+        nutr100 = { kcal100: mK, carbs100: mC, protein100: mP, sugars100: mS };
+        // save to custom DB once
+        if (!customDB.find(p => p.name === name)) {
+          customDB.push({ name, kcal100: mK, carbs100: mC, protein100: mP, sugars100: mS });
+          saveCustomDB();
+        }
+      } else {
+        if (!name || !lastNutri) {
+          return alert('Busca o ingresa un producto antes de añadir');
+        }
+        nutr100 = lastNutri;
+      }
       const factor = unit === 'u' ? qty : qty / 100;
       const nut = {
-        kcal: Math.round(lastNutri.kcal100 * factor),
-        carbs: +(lastNutri.carbs100 * factor).toFixed(1),
-        protein: +(lastNutri.protein100 * factor).toFixed(1),
-        sugars: +(lastNutri.sugars100 * factor).toFixed(1)
+        kcal: Math.round(nutr100.kcal100 * factor),
+        carbs: +(nutr100.carbs100 * factor).toFixed(1),
+        protein: +(nutr100.protein100 * factor).toFixed(1),
+        sugars: +(nutr100.sugars100 * factor).toFixed(1)
       };
       const date = new Date().toISOString().split('T')[0];
       const entries = loadEntries();
@@ -257,6 +291,14 @@
       // Reset inputs
       foodEl.value = '';
       qtyEl.value = '';
+      if (manualToggle.checked) {
+        mkEl.value = '';
+        mcEl.value = '';
+        mpEl.value = '';
+        msEl.value = '';
+        manualToggle.checked = false;
+        manualFields.style.display = 'none';
+      }
       lastNutri = null;
       render();
     });
@@ -272,90 +314,8 @@
 
     // Export data
     exportBtn.addEventListener('click', () => {
-      const data = { entries: loadEntries(), liquids: loadLiquids(), favorites: loadFavs() };
+      const data = { entries: loadEntries(), liquids: loadLiquids(), favorites: loadFavs(), custom: customDB };
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'app_alimentaria_backup.json';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    });
-
-    // Import data
-    importBtn.addEventListener('click', () => {
-      const file = importInput.files[0];
-      if (!file) return alert('Selecciona un archivo JSON');
-      const reader = new FileReader();
-      reader.onload = e => {
-        try {
-          const data = JSON.parse(e.target.result);
-          saveEntries(data.entries || []);
-          saveLiquids(data.liquids || {});
-          saveFavs(data.favorites || []);
-          renderFavs();
-          render();
-          alert('Importación completa');
-        } catch {
-          alert('Formato de archivo no válido');
-        }
-      };
-      reader.readAsText(file);
-    });
-
-    // Month filter and render
-    monthSelectEl.addEventListener('change', render);
-
-    function render() {
-      const entries = loadEntries();
-      const liquids = loadLiquids();
-      // Daily summary
-      const today = new Date().toISOString().split('T')[0];
-      const dayRec = entries.find(d => d.date === today);
-      const dK = dayRec ? dayRec.totals.kcal : 0;
-      const dP = dayRec ? dayRec.totals.protein : 0;
-      dailyKcalEl.textContent = `${dK} kcal`;
-      dailyProtEl.textContent = `${dP.toFixed(1)} g`;
-      // Monthly summary
-      const sel = monthSelectEl.value;
-      let mK = 0, mP = 0;
-      entries.filter(d => !sel || d.date.startsWith(sel)).forEach(d => { mK += d.totals.kcal; mP += d.totals.protein; });
-      monthlyKcalEl.textContent = `${mK} kcal`;
-      monthlyProtEl.textContent = `${mP.toFixed(1)} g`;
-      // Entries
-      entriesEl.innerHTML = '';
-      entries.filter(d => !sel || d.date.startsWith(sel)).forEach((day, i) => {
-        const div = document.createElement('div'); div.className = 'entry';
-        const hd = document.createElement('div'); hd.className = 'date-header'; hd.textContent = day.date;
-        div.appendChild(hd);
-        day.items.forEach((it, j) => {
-          const row = document.createElement('div'); row.className = 'item';
-          row.innerHTML = `<span class='name'>[${it.meal}] ${it.name}</span><div class='details'><span>${it.kcal} kcal</span><span>${it.protein} g P</span><span>${it.carbs} g C</span></div><button class='btn-delete'>✖</button>`;
-          row.querySelector('.btn-delete').addEventListener('click', () => {
-            day.items.splice(j, 1);
-            ['kcal', 'carbs', 'protein', 'sugars'].forEach(k => day.totals[k] -= it[k]);
-            if (!day.items.length) entries.splice(i, 1);
-            saveEntries(entries);
-            render();
-          });
-          div.appendChild(row);
-        });
-        if (liquids[day.date]) {
-          const ld = document.createElement('div'); ld.className = 'item';
-          const l = liquids[day.date];
-          ld.innerHTML = `<span>Líquidos</span><div class='details'><span>${l.water} ml</span><span>${l.coffee} ml</span><span>${l.soda} ml</span></div>`;
-          div.appendChild(ld);
-        }
-        entriesEl.appendChild(div);
-      });
-    }
-
-    // Initial render
-    renderFavs();
-    render();
-  });
-</script>
 </body>
 </html>
