@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App Alimentaria</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --primary-start:#4f46e5;--primary-end:#3b82f6;--bg:#f0f4f8;--card:#fff;--text:#1f2937;--subtext:#4b5563;--accent:#10b981;--danger:#ef4444; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); }
+    header { background:linear-gradient(135deg,var(--primary-start),var(--primary-end)); padding:80px 0 40px; text-align:center; color:#fff; }
+    header h1 { margin:0; font-size:2.5rem; font-weight:800; letter-spacing:1px; }
+    header p { margin:8px 0 0; font-size:1rem; font-weight:400; opacity:0.9; }
+    .container { max-width:700px; margin:16px auto 32px; padding:0 24px; }
+    .form { background:var(--card); border-radius:16px; padding:24px; box-shadow:0 10px 20px rgba(0,0,0,0.05); position:relative; top:-20px; z-index:1; }
+    .form select, .form input, .form button { width:100%; padding:12px 16px; margin:8px 0; border-radius:8px; border:1px solid #e5e7eb; font-size:1rem; }
+    .flex-row { display:flex; gap:12px; }
+    .status { font-size:.85rem; color:var(--subtext); margin:4px 0; }
+    .summary { display:flex; justify-content:space-between; margin:24px 0; padding:16px; background:var(--card); border-radius:16px; box-shadow:0 6px 15px rgba(0,0,0,0.05); }
+    .summary > div { flex:1; text-align:center; }
+    .summary .label { font-size:.9rem; color:var(--subtext); }
+    .summary .value { font-size:1.6rem; font-weight:800; color:var(--text); margin-top:4px; }
+    .entry { background:var(--card); border-radius:12px; padding:16px; margin-bottom:16px; box-shadow:0 4px 12px rgba(0,0,0,0.03); }
+    .date-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+    .item { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f0f0f0; }
+    .item:last-child { border-bottom:none; }
+    .details { display:flex; gap:8px; font-size:.9rem; }
+    .name { font-weight:600; }
+    .btn-delete { background:none; border:none; font-size:1.1rem; color:var(--danger); cursor:pointer; margin-left:8px; }
+    #favorites { background:var(--card); border-radius:12px; padding:16px; margin:24px 0; box-shadow:0 4px 12px rgba(0,0,0,0.03); }
+    #favorites h2 { margin:0 0 12px; font-size:1.1rem; color:var(--primary-start); }
+    .fav-item { background:var(--accent); color:#fff; padding:6px 12px; border-radius:8px; cursor:pointer; margin:4px; display:inline-block; }
+    #favBtn { background:none; border:none; font-size:1.5rem; color:var(--danger); cursor:pointer; margin-left:8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>App Alimentaria</h1>
+    <p>Controla tu dieta fácilmente</p>
+  </header>
+  <div class="container">
+    <div id="favorites">
+      <h2>Favoritos</h2>
+      <div id="favList"></div>
+    </div>
+    <div class="form">
+      <select id="mealSelect"><option>Desayuno</option><option>Almuerzo</option><option>Merienda</option><option>Cena</option></select>
+      <div class="flex-row">
+        <input id="barcodeInput" placeholder="EAN de producto" />
+        <button id="barcodeBtn" type="button">🔍</button>
+      </div>
+      <div id="barcodeStatus" class="status"></div>
+      <div class="flex-row">
+        <input id="foodInput" placeholder="Alimento o método" list="commonFoods" />
+        <button id="fetchBtn" type="button">Buscar</button>
+        <button id="favBtn" type="button">♡</button>
+      </div>
+      <div id="searchStatus" class="status"></div>
+      <div id="nutrInfo" class="status"></div>
+      <div id="sourceLink" class="status"></div>
+      <label><input type="checkbox" id="manualToggle" /> Ingreso manual</label>
+      <div id="manualFields" class="manual-section">
+        <div class="flex-row">
+          <input id="manualKcal" type="number" placeholder="kcal/100g" />
+          <input id="manualCarbs" type="number" placeholder="Carbs/100g" />
+        </div>
+        <div class="flex-row">
+          <input id="manualProtein" type="number" placeholder="Prot/100g" />
+          <input id="manualSugars" type="number" placeholder="Azúcares/100g" />
+        </div>
+      </div>
+      <div class="flex-row">
+        <input id="quantityInput" type="number" placeholder="Cantidad" />
+        <select id="unitSelect"><option value="g">g</option><option value="u">u</option><option value="ml">ml</option></select>
+      </div>
+      <button id="addBtn" type="button">➕ Añadir</button>
+      <div class="flex-row">
+        <input id="waterInput" type="number" placeholder="Agua (ml)" />
+        <input id="coffeeInput" type="number" placeholder="Café (ml)" />
+        <input id="sodaInput" type="number" placeholder="Soda (ml)" />
+      </div>
+      <button id="saveLiquidsBtn" type="button">💧 Guardar líquidos</button>
+      <div class="flex-row">
+        <button id="exportBtn" type="button">📤 Exportar</button>
+        <input id="importInput" type="file" accept="application/json" />
+        <button id="importBtn" type="button">📥 Importar</button>
+      </div>
+    </div>
+    <div class="summary">
+      <div>
+        <div class="label">Hoy</div>
+        <div class="value" id="dailyKcal">0 kcal</div>
+        <div class="label">Prot</div>
+        <div class="value" id="dailyProt">0 g</div>
+      </div>
+      <div>
+        <div class="label">Mes</div>
+        <div class="value" id="monthlyKcal">0 kcal</div>
+        <div class="label">Prot</div>
+        <div class="value" id="monthlyProt">0 g</div>
+      </div>
+    </div>
+    <input type="month" id="monthSelect" />
+    <div id="entries"></div>
+  </div>
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Element references
+    const mealEl = document.getElementById('mealSelect');
+    const barcodeInput = document.getElementById('barcodeInput');
+    const barcodeBtn = document.getElementById('barcodeBtn');
+    const barcodeStatus = document.getElementById('barcodeStatus');
+    const foodEl = document.getElementById('foodInput');
+    const fetchBtn = document.getElementById('fetchBtn');
+    const searchStatusEl = document.getElementById('searchStatus');
+    const nutrInfoEl = document.getElementById('nutrInfo');
+    const sourceLinkEl = document.getElementById('sourceLink');
+    const manualToggle = document.getElementById('manualToggle');
+    const manualFields = document.getElementById('manualFields');
+    const qtyEl = document.getElementById('quantityInput');
+    const unitEl = document.getElementById('unitSelect');
+    const addBtn = document.getElementById('addBtn');
+    const waterInput = document.getElementById('waterInput');
+    const coffeeInput = document.getElementById('coffeeInput');
+    const sodaInput = document.getElementById('sodaInput');
+    const saveLiquidsBtn = document.getElementById('saveLiquidsBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const importInput = document.getElementById('importInput');
+    const importBtn = document.getElementById('importBtn');
+    const favBtn = document.getElementById('favBtn');
+    const favListEl = document.getElementById('favList');
+    const dailyKcalEl = document.getElementById('dailyKcal');
+    const dailyProtEl = document.getElementById('dailyProt');
+    const monthlyKcalEl = document.getElementById('monthlyKcal');
+    const monthlyProtEl = document.getElementById('monthlyProt');
+    const monthSelectEl = document.getElementById('monthSelect');
+    const entriesEl = document.getElementById('entries');
+
+    // Storage keys
+    const STORAGE_KEY = 'calorie_entries';
+    const LIQUIDS_KEY = 'liquid_intake';
+    const FAV_KEY = 'fav_products';
+
+    // State
+    let lastNutri = null;
+    let lastName = '';
+
+    // Storage helpers
+    const loadEntries = () => JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const saveEntries = e => localStorage.setItem(STORAGE_KEY, JSON.stringify(e));
+    const loadLiquids = () => JSON.parse(localStorage.getItem(LIQUIDS_KEY) || '{}');
+    const saveLiquids = l => localStorage.setItem(LIQUIDS_KEY, JSON.stringify(l));
+    const loadFavs = () => JSON.parse(localStorage.getItem(FAV_KEY) || '[]');
+    const saveFavs = f => localStorage.setItem(FAV_KEY, JSON.stringify(f));
+
+    // Render favorites
+    function renderFavs() {
+      favListEl.innerHTML = '';
+      loadFavs().forEach(name => {
+        const btn = document.createElement('div');
+        btn.className = 'fav-item';
+        btn.textContent = name;
+        btn.addEventListener('click', () => { foodEl.value = name; });
+        favListEl.appendChild(btn);
+      });
+    }
+
+    // Favorite toggle
+    favBtn.addEventListener('click', () => {
+      if (!lastName) return;
+      let favs = loadFavs();
+      if (favs.includes(lastName)) favs = favs.filter(n => n !== lastName);
+      else favs.push(lastName);
+      saveFavs(favs);
+      renderFavs();
+      favBtn.textContent = favs.includes(lastName) ? '❤️' : '♡';
+    });
+
+    // Manual toggle
+    manualToggle.addEventListener('change', () => {
+      manualFields.style.display = manualToggle.checked ? 'block' : 'none';
+      fetchBtn.disabled = manualToggle.checked;
+    });
+
+    // Barcode lookup
+    barcodeBtn.addEventListener('click', async () => {
+      const code = barcodeInput.value.trim();
+      if (!code) return alert('Ingresa un código');
+      barcodeStatus.textContent = 'Buscando...';
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+        const data = await res.json();
+        if (data.status === 1) fillProduct(data.product);
+        else barcodeStatus.textContent = 'No encontrado';
+      } catch {
+        barcodeStatus.textContent = 'Error';
+      }
+    });
+
+    // Name search
+    fetchBtn.addEventListener('click', async () => {
+      const name = foodEl.value.trim();
+      if (!name) return alert('Ingresa un nombre');
+      searchStatusEl.textContent = 'Buscando...';
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(name)}&search_simple=1&action=process&json=1`);
+        const data = await res.json();
+        if (data.products && data.products.length) fillProduct(data.products[0]);
+        else searchStatusEl.textContent = 'No encontrado';
+      } catch {
+        searchStatusEl.textContent = 'Error';
+      }
+    });
+
+    function fillProduct(prod) {
+      lastName = prod.product_name || prod.brands || '';
+      foodEl.value = lastName;
+      const p = prod.nutriments || {};
+      lastNutri = {
+        kcal100: p['energy-kcal_100g'] || 0,
+        carbs100: p['carbohydrates_100g'] || 0,
+        protein100: p['proteins_100g'] || 0,
+        sugars100: p['sugars_100g'] || 0
+      };
+      nutrInfoEl.textContent = `100g → ${lastNutri.kcal100} kcal | ${lastNutri.carbs100}g carbs | ${lastNutri.protein100}g prot | ${lastNutri.sugars100}g azúcares`;
+      sourceLinkEl.innerHTML = `<a href="${prod.url || '#'}" target="_blank">Fuente</a>`;
+      barcodeStatus.textContent = '';
+      searchStatusEl.textContent = '';
+      favBtn.textContent = loadFavs().includes(lastName) ? '❤️' : '♡';
+    }
+
+    // Add entry
+    addBtn.addEventListener('click', () => {
+      const meal = mealEl.value;
+      const name = foodEl.value.trim();
+      const qty = parseFloat(qtyEl.value);
+      const unit = unitEl.value;
+      if (!meal || !name || isNaN(qty) || !lastNutri) return alert('Completa todos los campos');
+      const factor = unit === 'u' ? qty : qty / 100;
+      const nut = {
+        kcal: Math.round(lastNutri.kcal100 * factor),
+        carbs: +(lastNutri.carbs100 * factor).toFixed(1),
+        protein: +(lastNutri.protein100 * factor).toFixed(1),
+        sugars: +(lastNutri.sugars100 * factor).toFixed(1)
+      };
+      const date = new Date().toISOString().split('T')[0];
+      const entries = loadEntries();
+      let day = entries.find(d => d.date === date);
+      if (!day) {
+        day = { date, items: [], totals: { kcal: 0, carbs: 0, protein: 0, sugars: 0 } };
+        entries.push(day);
+      }
+      day.items.push({ meal, name, qty, unit, ...nut });
+      ['kcal', 'carbs', 'protein', 'sugars'].forEach(k => day.totals[k] += nut[k]);
+      saveEntries(entries);
+      // Reset inputs
+      foodEl.value = '';
+      qtyEl.value = '';
+      lastNutri = null;
+      render();
+    });
+
+    // Save liquids
+    saveLiquidsBtn.addEventListener('click', () => {
+      const date = new Date().toISOString().split('T')[0];
+      const liquids = loadLiquids();
+      liquids[date] = { water: +waterInput.value || 0, coffee: +coffeeInput.value || 0, soda: +sodaInput.value || 0 };
+      saveLiquids(liquids);
+      render();
+    });
+
+    // Export data
+    exportBtn.addEventListener('click', () => {
+      const data = { entries: loadEntries(), liquids: loadLiquids(), favorites: loadFavs() };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'app_alimentaria_backup.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+
+    // Import data
+    importBtn.addEventListener('click', () => {
+      const file = importInput.files[0];
+      if (!file) return alert('Selecciona un archivo JSON');
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const data = JSON.parse(e.target.result);
+          saveEntries(data.entries || []);
+          saveLiquids(data.liquids || {});
+          saveFavs(data.favorites || []);
+          renderFavs();
+          render();
+          alert('Importación completa');
+        } catch {
+          alert('Formato de archivo no válido');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    // Month filter and render
+    monthSelectEl.addEventListener('change', render);
+
+    function render() {
+      const entries = loadEntries();
+      const liquids = loadLiquids();
+      // Daily summary
+      const today = new Date().toISOString().split('T')[0];
+      const dayRec = entries.find(d => d.date === today);
+      const dK = dayRec ? dayRec.totals.kcal : 0;
+      const dP = dayRec ? dayRec.totals.protein : 0;
+      dailyKcalEl.textContent = `${dK} kcal`;
+      dailyProtEl.textContent = `${dP.toFixed(1)} g`;
+      // Monthly summary
+      const sel = monthSelectEl.value;
+      let mK = 0, mP = 0;
+      entries.filter(d => !sel || d.date.startsWith(sel)).forEach(d => { mK += d.totals.kcal; mP += d.totals.protein; });
+      monthlyKcalEl.textContent = `${mK} kcal`;
+      monthlyProtEl.textContent = `${mP.toFixed(1)} g`;
+      // Entries
+      entriesEl.innerHTML = '';
+      entries.filter(d => !sel || d.date.startsWith(sel)).forEach((day, i) => {
+        const div = document.createElement('div'); div.className = 'entry';
+        const hd = document.createElement('div'); hd.className = 'date-header'; hd.textContent = day.date;
+        div.appendChild(hd);
+        day.items.forEach((it, j) => {
+          const row = document.createElement('div'); row.className = 'item';
+          row.innerHTML = `<span class='name'>[${it.meal}] ${it.name}</span><div class='details'><span>${it.kcal} kcal</span><span>${it.protein} g P</span><span>${it.carbs} g C</span></div><button class='btn-delete'>✖</button>`;
+          row.querySelector('.btn-delete').addEventListener('click', () => {
+            day.items.splice(j, 1);
+            ['kcal', 'carbs', 'protein', 'sugars'].forEach(k => day.totals[k] -= it[k]);
+            if (!day.items.length) entries.splice(i, 1);
+            saveEntries(entries);
+            render();
+          });
+          div.appendChild(row);
+        });
+        if (liquids[day.date]) {
+          const ld = document.createElement('div'); ld.className = 'item';
+          const l = liquids[day.date];
+          ld.innerHTML = `<span>Líquidos</span><div class='details'><span>${l.water} ml</span><span>${l.coffee} ml</span><span>${l.soda} ml</span></div>`;
+          div.appendChild(ld);
+        }
+        entriesEl.appendChild(div);
+      });
+    }
+
+    // Initial render
+    renderFavs();
+    render();
+  });
+</script>
+</body>
+</html>
